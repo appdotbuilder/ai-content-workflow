@@ -1,56 +1,84 @@
+import { db } from '../db';
+import { contentTable, usersTable } from '../db/schema';
 import { type Content } from '../schema';
+import { eq } from 'drizzle-orm';
 
 export async function scheduleContent(contentId: number, scheduledAt: Date): Promise<Content> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is scheduling approved content for future publication.
-    // It should:
-    // 1. Verify content is approved
-    // 2. Set the scheduled_at timestamp
-    // 3. Update status to 'scheduled'
-    // 4. Validate scheduling constraints (e.g., not in the past)
-    
-    return Promise.resolve({
-        id: contentId,
-        user_id: 1, // Placeholder
-        title: 'Scheduled content',
-        caption: 'This content is scheduled for publication',
-        hashtags: null,
-        platform: 'instagram',
-        content_type: 'post',
-        status: 'scheduled',
-        ai_generated: true,
+  try {
+    // Validate that scheduled time is in the future
+    const now = new Date();
+    if (scheduledAt <= now) {
+      throw new Error('Cannot schedule content for a past date or current time');
+    }
+
+    // First, fetch the current content to verify it exists and is approved
+    const existingContent = await db.select()
+      .from(contentTable)
+      .where(eq(contentTable.id, contentId))
+      .execute();
+
+    if (existingContent.length === 0) {
+      throw new Error(`Content with id ${contentId} not found`);
+    }
+
+    const content = existingContent[0];
+
+    // Verify content is approved
+    if (content.status !== 'approved') {
+      throw new Error('Only approved content can be scheduled');
+    }
+
+    // Update the content with scheduled information
+    const result = await db.update(contentTable)
+      .set({
         scheduled_at: scheduledAt,
-        approved_at: new Date(),
-        approved_by: 1,
-        rejected_reason: null,
-        created_at: new Date(),
-        updated_at: new Date(),
-    } as Content);
+        status: 'scheduled',
+        updated_at: new Date()
+      })
+      .where(eq(contentTable.id, contentId))
+      .returning()
+      .execute();
+
+    return result[0];
+  } catch (error) {
+    console.error('Content scheduling failed:', error);
+    throw error;
+  }
 }
 
 export async function unscheduleContent(contentId: number): Promise<Content> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is removing scheduling from content.
-    // It should:
-    // 1. Clear the scheduled_at timestamp
-    // 2. Update status back to 'approved'
-    // 3. Validate that content is currently scheduled
-    
-    return Promise.resolve({
-        id: contentId,
-        user_id: 1, // Placeholder
-        title: 'Unscheduled content',
-        caption: 'This content scheduling was removed',
-        hashtags: null,
-        platform: 'instagram',
-        content_type: 'post',
-        status: 'approved',
-        ai_generated: true,
+  try {
+    // First, fetch the current content to verify it exists and is scheduled
+    const existingContent = await db.select()
+      .from(contentTable)
+      .where(eq(contentTable.id, contentId))
+      .execute();
+
+    if (existingContent.length === 0) {
+      throw new Error(`Content with id ${contentId} not found`);
+    }
+
+    const content = existingContent[0];
+
+    // Verify content is currently scheduled
+    if (content.status !== 'scheduled') {
+      throw new Error('Only scheduled content can be unscheduled');
+    }
+
+    // Update the content to remove scheduling
+    const result = await db.update(contentTable)
+      .set({
         scheduled_at: null,
-        approved_at: new Date(),
-        approved_by: 1,
-        rejected_reason: null,
-        created_at: new Date(),
-        updated_at: new Date(),
-    } as Content);
+        status: 'approved',
+        updated_at: new Date()
+      })
+      .where(eq(contentTable.id, contentId))
+      .returning()
+      .execute();
+
+    return result[0];
+  } catch (error) {
+    console.error('Content unscheduling failed:', error);
+    throw error;
+  }
 }

@@ -1,14 +1,36 @@
+import { db } from '../db';
+import { contentTable } from '../db/schema';
 import { type Content } from '../schema';
+import { eq } from 'drizzle-orm';
 
 export async function getContent(userId: number): Promise<Content[]> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is fetching all content for a specific user from the database.
-    // It should return content with all associated data including approval status.
-    return Promise.resolve([]);
+  try {
+    // Fetch all content for the specified user
+    const results = await db.select()
+      .from(contentTable)
+      .where(eq(contentTable.user_id, userId))
+      .execute();
+
+    // Return the results directly - no numeric conversions needed for this schema
+    return results;
+  } catch (error) {
+    console.error('Get content failed:', error);
+    throw error;
+  }
 }
 
 export async function getContentById(contentId: number): Promise<Content | null> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is fetching a specific piece of content by ID.
-    return Promise.resolve(null);
+  try {
+    // Fetch specific content by ID
+    const results = await db.select()
+      .from(contentTable)
+      .where(eq(contentTable.id, contentId))
+      .execute();
+
+    // Return the first result or null if not found
+    return results.length > 0 ? results[0] : null;
+  } catch (error) {
+    console.error('Get content by ID failed:', error);
+    throw error;
+  }
 }

@@ -1,30 +1,47 @@
+import { db } from '../db';
+import { contentTable } from '../db/schema';
 import { type ApproveContentInput, type Content } from '../schema';
+import { eq } from 'drizzle-orm';
 
-export async function approveContent(input: ApproveContentInput): Promise<Content> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is processing content approval/rejection in the workflow.
-    // It should:
-    // 1. Update the content status to 'approved' or 'rejected'
-    // 2. Set the approved_by field if approved
-    // 3. Set approved_at timestamp if approved
-    // 4. Set rejected_reason if rejected
-    // 5. Update workflow instance progress if applicable
-    
-    return Promise.resolve({
-        id: input.content_id,
-        user_id: 1, // Placeholder
-        title: 'Content title',
-        caption: 'Content caption',
-        hashtags: null,
-        platform: 'instagram',
-        content_type: 'post',
-        status: input.approved ? 'approved' : 'rejected',
-        ai_generated: true,
-        scheduled_at: null,
-        approved_at: input.approved ? new Date() : null,
-        approved_by: input.approved ? input.approved_by : null,
-        rejected_reason: input.approved ? null : (input.rejection_reason || 'No reason provided'),
-        created_at: new Date(),
-        updated_at: new Date(),
-    } as Content);
-}
+export const approveContent = async (input: ApproveContentInput): Promise<Content> => {
+  try {
+    // First, verify the content exists
+    const existingContent = await db.select()
+      .from(contentTable)
+      .where(eq(contentTable.id, input.content_id))
+      .execute();
+
+    if (existingContent.length === 0) {
+      throw new Error(`Content with id ${input.content_id} not found`);
+    }
+
+    // Prepare update data based on approval status
+    const updateData: any = {
+      updated_at: new Date(),
+    };
+
+    if (input.approved) {
+      updateData.status = 'approved';
+      updateData.approved_by = input.approved_by;
+      updateData.approved_at = new Date();
+      updateData.rejected_reason = null; // Clear any previous rejection reason
+    } else {
+      updateData.status = 'rejected';
+      updateData.rejected_reason = input.rejection_reason || 'No reason provided';
+      updateData.approved_by = null;
+      updateData.approved_at = null;
+    }
+
+    // Update the content
+    const result = await db.update(contentTable)
+      .set(updateData)
+      .where(eq(contentTable.id, input.content_id))
+      .returning()
+      .execute();
+
+    return result[0];
+  } catch (error) {
+    console.error('Content approval failed:', error);
+    throw error;
+  }
+};
